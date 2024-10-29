@@ -1,4 +1,5 @@
 import csv
+import io
 from io import StringIO
 from typing import Any, Iterable, List, NamedTuple, Optional, Tuple, Type
 
@@ -123,3 +124,47 @@ def get_pk_fields(
         return get_fields_from_names(pk_field_names, model_meta)
 
     return [model_meta.pk]
+
+
+def models_to_tsv_lazy_file(
+    models: Iterable[Any],
+    include_fields: Iterable[models.Field],
+    connection: BaseDatabaseWrapper,
+    django_field_to_value=_default_model_to_value,
+) -> io.TextIOBase:
+    def lazy_data_generator():
+        for obj in models:
+            row = []
+            for include_field in include_fields:
+                field_val = django_field_to_value(obj, include_field, connection)
+                if isinstance(field_val, connection.Database.Binary):
+                    # We can migrate to psychopg 3 which has more advanced copy commands for binary once we upgrade
+                    # Django to 4.1+
+                    raise ValueError("Binary data is not supported in bulk operations")
+                elif field_val is None:
+                    row.append(NULL_CHARACTER)
+                elif isinstance(field_val, Json):
+                    row.append(field_val.dumps(field_val.adapted))
+                else:
+                    row.append(str(field_val))
+            yield '\t'.join(row) + '\n'
+
+    class LazyFile(io.TextIOBase):
+        def __init__(self, generator):
+            self.generator = generator
+            self.iterator = iter(generator)
+
+        def read(self, size=-1):
+            # If size is -1, return everything.
+            if size == -1:
+                return ''.join(self.iterator)
+
+            try:
+                return next(self.iterator)
+            except StopIteration:
+                return ''
+
+        def readline(self):
+            raise NotImplementedError("readline is not supported for lazy files")
+
+    return LazyFile(lazy_data_generator())

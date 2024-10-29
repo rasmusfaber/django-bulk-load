@@ -14,7 +14,7 @@ from .django import (
     get_model_fields,
     get_pk_fields,
     models_to_tsv_buffer,
-    records_to_models,
+    records_to_models, models_to_tsv_lazy_file,
 )
 from .database import execute_values, Composable
 from .queries import (
@@ -55,7 +55,7 @@ def create_temp_table_and_load(
         source_table_name=source_table_name,
         column_names=[x.column for x in fields],
     )
-    tsv_buffer = models_to_tsv_buffer(models, fields, connection=connection)
+    tsv_buffer = models_to_tsv_lazy_file(models, fields, connection=connection)
     cursor.execute(temp_table_query)
     cursor.copy_expert(
         copy_query(table_name),

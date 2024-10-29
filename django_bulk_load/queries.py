@@ -16,7 +16,7 @@ def create_temp_table(temp_table_name, source_table_name, column_names):
     )
 
 def copy_query(table_name: str):
-    return SQL("COPY {table_name} FROM STDIN NULL '\\N' DELIMITER '\t' CSV").format(
+    return SQL("COPY {table_name} FROM STDIN").format(
         table_name=Identifier(table_name)
     )
 
